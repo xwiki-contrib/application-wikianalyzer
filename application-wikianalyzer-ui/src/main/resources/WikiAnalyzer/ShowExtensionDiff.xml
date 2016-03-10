@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xwikidoc reference="WikiAnalyzer.ShowExtensionDiff" locale="">
+  <web>WikiAnalyzer</web>
+  <name>ShowExtensionDiff</name>
+  <language/>
+  <defaultLanguage/>
+  <translation>0</translation>
+  <parent>AllDocsStatus</parent>
+  <creator>xwiki:XWiki.Admin</creator>
+  <author>xwiki:XWiki.Admin</author>
+  <customClass/>
+  <contentAuthor>xwiki:XWiki.Admin</contentAuthor>
+  <creationDate>1444853960000</creationDate>
+  <date>1457610172000</date>
+  <contentUpdateDate>1457610172000</contentUpdateDate>
+  <version>1.1</version>
+  <title/>
+  <defaultTemplate/>
+  <validationScript/>
+  <comment/>
+  <minorEdit>false</minorEdit>
+  <syntaxId>xwiki/2.1</syntaxId>
+  <hidden>true</hidden>
+  <object>
+    <class>
+      <name>XWiki.StyleSheetExtension</name>
+      <customClass/>
+      <customMapping/>
+      <defaultViewSheet/>
+      <defaultEditSheet/>
+      <defaultWeb/>
+      <nameField/>
+      <validationScript/>
+      <cache>
+        <cache>0</cache>
+        <disabled>0</disabled>
+        <displayType>select</displayType>
+        <multiSelect>0</multiSelect>
+        <name>cache</name>
+        <number>6</number>
+        <prettyName>Caching policy</prettyName>
+        <relationalStorage>0</relationalStorage>
+        <separator> </separator>
+        <separators>|, </separators>
+        <size>1</size>
+        <unmodifiable>0</unmodifiable>
+        <values>long|short|default|forbid</values>
+        <classType>com.xpn.xwiki.objects.classes.StaticListClass</classType>
+      </cache>
+      <code>
+        <disabled>0</disabled>
+        <name>code</name>
+        <number>3</number>
+        <prettyName>Code</prettyName>
+        <rows>20</rows>
+        <size>50</size>
+        <unmodifiable>0</unmodifiable>
+        <classType>com.xpn.xwiki.objects.classes.TextAreaClass</classType>
+      </code>
+      <contentType>
+        <cache>0</cache>
+        <disabled>0</disabled>
+        <displayType>select</displayType>
+        <multiSelect>0</multiSelect>
+        <name>contentType</name>
+        <number>1</number>
+        <prettyName>Content Type</prettyName>
+        <relationalStorage>0</relationalStorage>
+        <separator> </separator>
+        <separators>|, </separators>
+        <size>1</size>
+        <unmodifiable>0</unmodifiable>
+        <values>CSS|LESS</values>
+        <classType>com.xpn.xwiki.objects.classes.StaticListClass</classType>
+      </contentType>
+      <name>
+        <disabled>0</disabled>
+        <name>name</name>
+        <number>2</number>
+        <prettyName>Name</prettyName>
+        <size>30</size>
+        <unmodifiable>0</unmodifiable>
+        <classType>com.xpn.xwiki.objects.classes.StringClass</classType>
+      </name>
+      <parse>
+        <disabled>0</disabled>
+        <displayFormType>select</displayFormType>
+        <displayType>yesno</displayType>
+        <name>parse</name>
+        <number>5</number>
+        <prettyName>Parse content</prettyName>
+        <unmodifiable>0</unmodifiable>
+        <classType>com.xpn.xwiki.objects.classes.BooleanClass</classType>
+      </parse>
+      <use>
+        <cache>0</cache>
+        <disabled>0</disabled>
+        <displayType>select</displayType>
+        <multiSelect>0</multiSelect>
+        <name>use</name>
+        <number>4</number>
+        <prettyName>Use this extension</prettyName>
+        <relationalStorage>0</relationalStorage>
+        <separator> </separator>
+        <separators>|, </separators>
+        <size>1</size>
+        <unmodifiable>0</unmodifiable>
+        <values>currentPage|onDemand|always</values>
+        <classType>com.xpn.xwiki.objects.classes.StaticListClass</classType>
+      </use>
+    </class>
+    <name>WikiAnalyzer.ShowExtensionDiff</name>
+    <number>0</number>
+    <className>XWiki.StyleSheetExtension</className>
+    <guid>c4994f0e-dafe-4088-9c26-592c9d863204</guid>
+    <property>
+      <cache>long</cache>
+    </property>
+    <property>
+      <code>.diffaddword{color:#008000}
+.diffremoveword{color:#c33;text-decoration:line-through}</code>
+    </property>
+    <property>
+      <name/>
+    </property>
+    <property>
+      <parse/>
+    </property>
+    <property>
+      <use>currentPage</use>
+    </property>
+  </object>
+  <content>{{velocity}}
+#set ($xarRepo = $xwiki.parseGroovyFromPage('WikiAnalyzer.XarRepositoryGroovy'))
+$xarRepo.initialize($xcontext, $xwiki, $services)##
+#set ($page = $request.page)
+#set ($source = $!page.split(':'))
+#if ($!source.size() == 2)
+  #set($translatedDoc = $xwiki.getDocument($source[0]).getTranslatedDocument($source[1]))
+#else
+  #set($translatedDoc = $xwiki.getDocument($page))
+#end
+#if($translatedDoc &amp;&amp; !$translatedDoc.isNew())
+#set ($extId = $xarRepo.getExtensionId($request.extension, $request.version))
+$xwiki.ssx.use($doc.fullName)
+= Diff for [[$page&gt;&gt;$translatedDoc.fullName||queryString="viewer=history#if($!source.size() == 2)&amp;language=$source[1]#end" rel="__blank"]] against source extension $extId
+
+$services.logging.getLogger("Test").warn("WIKI:[#${xarRepo.getComparableXML($translatedDoc)}#]")
+$services.logging.getLogger("Test").warn("REPO:[#${xarRepo.getComparableXML($xarRepo.getDocumentFromExtension($extId,$page))}#]")
+
+{{html}}
+$xarRepo.getDiffAsHtml($xarRepo.getComparableXML($xarRepo.getDocumentFromExtension($extId,$page)), $xarRepo.getComparableXML($translatedDoc))
+{{/html}}
+
+#else
+
+{{warning}}No source document{{/warning}}
+
+#end
+{{/velocity}}</content>
+</xwikidoc>

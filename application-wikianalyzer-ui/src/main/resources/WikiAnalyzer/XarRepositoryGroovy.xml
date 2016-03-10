@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xwikidoc reference="WikiAnalyzer.XarRepositoryGroovy" locale="">
+  <web>WikiAnalyzer</web>
+  <name>XarRepositoryGroovy</name>
+  <language/>
+  <defaultLanguage/>
+  <translation>0</translation>
+  <parent>WebHome</parent>
+  <creator>xwiki:XWiki.Admin</creator>
+  <author>xwiki:XWiki.Admin</author>
+  <customClass/>
+  <contentAuthor>xwiki:XWiki.Admin</contentAuthor>
+  <creationDate>1444813197000</creationDate>
+  <date>1457610172000</date>
+  <contentUpdateDate>1457610172000</contentUpdateDate>
+  <version>1.1</version>
+  <title/>
+  <defaultTemplate/>
+  <validationScript/>
+  <comment/>
+  <minorEdit>false</minorEdit>
+  <syntaxId>xwiki/2.1</syntaxId>
+  <hidden>true</hidden>
+  <content>import org.xwiki.extension.repository.InstalledExtensionRepository;
+import com.xpn.xwiki.api.Document;
+import com.xpn.xwiki.doc.XWikiDocument;
+import java.util.zip.ZipInputStream;
+
+class XarRepository {
+  private def xwiki;
+  private def context;
+  private def services;
+  private def installedExtensions;
+  private def pageToExtensions;
+  private def svnRepo;
+
+  public void initialize(context, xwiki, services) {
+    this.xwiki = xwiki;
+    this.context = context;
+    this.services = services;
+
+    this.installedExtensions = services.component.componentManager.getInstance(InstalledExtensionRepository.class, 'xar').installedExtensions.collectEntries({ [(it.id): it] });
+
+    try {
+      if (!xwiki.getDocument('SVNCode.SVNGroovy').isNew()) {
+        def configs = services.query.xwql("from doc.object(SVNCode.SVNConfigClass) as config where doc.name &lt;&gt; 'SVNConfigTemplate'").execute();
+        def confDoc = configs.find({ services.model.resolveDocument(it).name.startsWith(context.userReference.name) });
+        if (!confDoc &amp;&amp; configs.size() &gt; 0) {
+          confDoc = configs[0];
+        }
+
+        if (confDoc) {
+          def svnr = xwiki.parseGroovyFromPage("SVNCode.SVNGroovy");
+          if (svnr) svnr.setXWiki(xwiki, context);
+          if (svnr.hasProgrammingRights()) {
+            svnr.setSVNConfig(confDoc);
+            if (svnr.initRepository()) {
+              this.svnRepo = svnr;
+            }
+          }
+        }
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  public boolean hasSVN() {
+    return svnRepo != null;
+  }
+
+  public void initializeReversePageMap() {
+    this.pageToExtensions = [:];
+    this.services.component.componentManager.getInstance(InstalledExtensionRepository.class, 'xar').getInstalledExtensions("wiki:${this.context.database}").each { ext -&gt;
+      def pages = null;
+      try {
+        pages = ext.getXarPackage().getEntries().collect ({
+          def pageName = this.services.model.serialize(it);
+          if (it.locale != Locale.ROOT) {
+            pageName += ':' + it.locale;
+          }
+          return pageName;
+        });      
+      } catch (groovy.lang.MissingMethodException e) {
+        pages = ext.getPages().collect ({
+          def pageName = this.services.model.serialize(it.documentReference);
+          if (it.locale != Locale.ROOT) {
+            pageName += ':' + it.locale;
+          }
+          return pageName;
+        });
+      }
+      pages.each { pageName -&gt;
+        def extList = this.pageToExtensions.get(pageName);
+        if (!extList) {
+          this.pageToExtensions.put(pageName,  [ ext.id ]);
+        } else {    
+          extList.add(ext.id);
+        }
+      }
+    }
+  }
+
+  public def getInstalledExtensionIds() {
+    return this.installedExtensions.values().sort({it.name}).collect({it.id});
+  }
+
+  public def getExtensionName(def id) {
+    return this.installedExtensions.get(id).name;
+  }
+
+  public def getExtensionNamespaceNames(def id) {
+    def ext = this.installedExtensions.get(id);
+    if (ext.namespaces) {
+      return ext.namespaces.sort();
+    } else {
+      return ['**Farm**'];
+    }
+  }
+
+  public def getXarEntryName(def xarEntry) {
+    def name = this.services.model.serialize(xarEntry);
+    if (xarEntry.locale &amp;&amp; xarEntry.locale != Locale.ROOT) {
+      name += ':' + xarEntry.locale;
+    }
+    return name;
+  }
+
+  public def getOldXarEntryName(def xarEntry) {
+    def name = this.services.model.serialize(xarEntry.documentReference);
+    if (xarEntry.locale &amp;&amp; xarEntry.locale != Locale.ROOT) {
+      name += ':' + xarEntry.locale;
+    }
+    return name;
+  }
+
+  public def getExtensionId(def extension, def version) {
+    return new org.xwiki.extension.ExtensionId(extension, version);
+  }
+
+  public def getExtensionPageNames(def id) {
+    try {
+      return this.installedExtensions.get(id).getXarPackage().getEntries().collect({ getXarEntryName(it) }).sort();
+    } catch (groovy.lang.MissingMethodException e) {
+      return this.installedExtensions.get(id).getPages().collect({ getOldXarEntryName(it) }).sort();
+    }
+  }
+
+  public def getExtensionForPage(def pageName) {
+    def extIds = this.pageToExtensions.get(pageName);
+    if (extIds) {
+      return Collections.unmodifiableCollection(extIds);
+    }
+    return null;
+  }
+
+  public def getDocumentFromExtension(def id, def pageName) {
+    def ext = this.installedExtensions.get(id);
+    def xarEntry = null;
+    try {
+      xarEntry = ext.getXarPackage().getEntries().find({getXarEntryName(it).equals(pageName)});      
+    } catch (groovy.lang.MissingMethodException e) {
+      xarEntry = ext.getPages().find({getOldXarEntryName(it).equals(pageName)});
+    }
+    def zis = new ZipInputStream(ext.file.openStream());
+    def zipEntry;
+    byte[] buffer = new byte[2048];
+    def newdoc = new XWikiDocument();
+    while ((zipEntry = zis.getNextEntry()) != null) {
+      if (zipEntry.name.equals(xarEntry.entryName)) {
+        newdoc.fromXML(zis);
+        break;
+      }
+    }
+    zis.close();
+    return new Document(newdoc, this.context.context);
+  }
+
+  public def getDocumentFromSVN(def pageName) {
+    if (!hasSVN()) return null;
+    def parsePage = pageName.split(':');
+    def page = pageName;
+    def language = '';
+    if (parsePage.size() &gt; 1) {
+      page = parsePage[0];
+      language = parsePage[1];
+    }
+    def pageRef = this.services.model.resolveDocument(page);
+    def content = this.svnRepo.getFileContentAsString(pageRef.lastSpaceReference.name, pageRef.name, language);
+    if (!content) return null;
+    def newdoc = new XWikiDocument();
+    newdoc.fromXML(content);
+    return new Document(newdoc, this.context.context);
+  }
+
+  public def cleanForComparison(def xml, def oneline = false) {
+    def content = xml.replaceAll("\r", "")
+    if (oneline) {
+      content = content.replaceAll("\n", "");
+    }
+    return content.replaceAll("(?s)&lt;attachment&gt;(.*?)&lt;date&gt;.*?&lt;/date&gt;(.*?)&lt;version&gt;.*?&lt;/version&gt;(.*?)&lt;content&gt;.*?&lt;/content&gt;(.*?)&lt;/attachment&gt;", "&lt;attachment&gt;\$1&lt;date&gt;&lt;/date&gt;\$2&lt;version&gt;&lt;/version&gt;\$3&lt;content&gt;&lt;/content&gt;\$4&lt;/attachment&gt;").replaceAll("(?s)&lt;guid&gt;(.*?)&lt;/guid&gt;", "&lt;guid&gt;&lt;/guid&gt;");
+  }
+
+  boolean isEqual(def oldContent, def newContent) {
+    oldContent = cleanForComparison(oldContent, true)
+    newContent = cleanForComparison(newContent, true)
+    return oldContent.equals(newContent);
+  }
+
+  String getDiffAsHtml(def oldContent, def newContent) {
+    oldContent = cleanForComparison(oldContent)
+    newContent = cleanForComparison(newContent)
+    return this.xwiki.diff.getDifferencesAsHTML(oldContent, newContent, false);
+  }
+
+  public getComparableXML(def document) {
+    def clonedDoc = document.document.clone();
+
+    def defaultUser = "xwiki:XWiki.Admin";
+    def defaultDate = new Date("01/01/2015");
+
+    // remove Tag object
+    if (clonedDoc.getObject("XWiki.TagClass")) {
+      clonedDoc.removeObject(clonedDoc.getObject("XWiki.TagClass"));
+    }
+
+    clonedDoc.setDefaultLocale(Locale.ROOT);
+
+    clonedDoc.setCreator(defaultUser);
+    clonedDoc.setContentAuthor(defaultUser);
+    clonedDoc.setAuthor(defaultUser);
+    
+    clonedDoc.attachmentList.each {
+      it.setAuthor(defaultUser);
+    }
+
+    clonedDoc.setCreationDate(defaultDate);
+    clonedDoc.setContentUpdateDate(defaultDate);
+    clonedDoc.setDate(defaultDate);
+          
+    clonedDoc.setVersion("1.1");
+    
+    clonedDoc.setComment("");
+    clonedDoc.setMinorEdit(false);
+    
+    return clonedDoc.toXML(true, false, true, false, context.getContext()).trim().replaceAll("[\r]","");
+  }
+}</content>
+</xwikidoc>

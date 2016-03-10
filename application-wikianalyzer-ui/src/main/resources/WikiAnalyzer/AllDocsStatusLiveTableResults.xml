@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xwikidoc reference="WikiAnalyzer.AllDocsStatusLiveTableResults" locale="">
+  <web>WikiAnalyzer</web>
+  <name>AllDocsStatusLiveTableResults</name>
+  <language/>
+  <defaultLanguage/>
+  <translation>0</translation>
+  <parent>WebHome</parent>
+  <creator>xwiki:XWiki.Admin</creator>
+  <author>xwiki:XWiki.Admin</author>
+  <customClass/>
+  <contentAuthor>xwiki:XWiki.Admin</contentAuthor>
+  <creationDate>1444831527000</creationDate>
+  <date>1457611492000</date>
+  <contentUpdateDate>1457611492000</contentUpdateDate>
+  <version>1.1</version>
+  <title/>
+  <defaultTemplate/>
+  <validationScript/>
+  <comment/>
+  <minorEdit>false</minorEdit>
+  <syntaxId>xwiki/2.1</syntaxId>
+  <hidden>true</hidden>
+  <content>{{include document="XWiki.LiveTableResultsMacros"/}}
+
+{{velocity output="false"}}
+#if("$!{request.xpage}" == 'plain')
+  $response.setContentType('application/json')
+#end
+#set($dq = '"')
+#set($xarRepo = $xwiki.parseGroovyFromPage('WikiAnalyzer.XarRepositoryGroovy'))
+$xarRepo.initialize($xcontext, $xwiki, $services)##
+$xarRepo.initializeReversePageMap()##
+##==================
+## Initialize the map that will store the JSON data.
+##==================
+#set($map = {})
+#set($reqcollist = $request.collist.split(','))
+#set($collist = [])
+#foreach($col in $reqcollist)
+  #if (!$col.startsWith('__'))
+    #set($discard = $collist.add($col))
+  #end
+#end
+##==================
+## Build the JSON in memory using the previous map
+##==================
+#set($className = "$!request.classname")
+#set($filterfrom = '')
+#set($filterwhere = '')
+#set($filterParams = [])
+#gridresultwithfilter_buildQuery($className $collist $filterfrom $filterwhere $filterParams)
+#if("$!request.sql" == '1')
+  #set($discard = $map.put('sql', $sql))
+  #set($discard = $map.put('countsql', $countSql))
+  #set($discard = $map.put('params', $sqlParams))
+#end
+#set($discard = $map.put('reqNo', $mathtool.toInteger($request.reqNo)))
+#set($offset = $mathtool.toInteger($request.get('offset')))
+## offset starts from 0 in velocity and 1 in javascript
+#set($offset = $offset - 1)
+#if (!$offset || $offset &lt; 0)
+  #set($offset = 0)
+#end
+#set($limit = $mathtool.toInteger($request.get('limit')))
+#if (!$limit)
+  #set ($limit = 15)
+#end
+#set($query = $services.query.hql($sql).addFilter('language').setLimit($limit).setOffset($offset).bindValues($sqlParams))
+#set($items = $query.execute())
+#set($discard = $map.put('totalrows', $query.count()))
+#set($discard = $map.put('returnedrows', $mathtool.min($items.size(), $limit)))
+#set($discard = $map.put('offset', $mathtool.add($offset, 1)))
+#set($rows = [])
+#foreach($item in $items)
+  #gridresult_buildRowJSON($item $rows)
+  #if("$!docLanguage" != '')
+    #set($page = "$docName:$docLanguage")
+    #set($wikidoc = $itemDoc.getTranslatedDocument($docLanguage))
+    #if ($xwiki.getLanguagePreference() == $docLanguage)
+      $row.put('doc_name', "${row.get('doc_name')} ($docLanguage)"))
+    #end
+  #else
+    #set($page = $docName)
+    #set($wikidoc = $itemDoc)
+  #end
+  #set($extIds = $xarRepo.getExtensionForPage($page))
+  #set($extFld = '')
+  #set($unchanged = '')
+  #if($extIds &amp;&amp; $extIds.size() &gt; 0)
+    #foreach($extId in $extIds)
+      #if($velocityCount &gt; 1)
+        #set($extFld = "${extFld}&lt;br/&gt;")
+      #else
+        #if ($xarRepo.isEqual($xarRepo.getComparableXML($wikidoc),$xarRepo.getComparableXML($xarRepo.getDocumentFromExtension($extId,$page))))
+          #set($unchanged = "&lt;img src=$dq$xwiki.getSkinFile('icons/silk/accept.png')$dq&gt;")
+        #else
+          #set($diffUrl = $xwiki.getURL('WikiAnalyzer.ShowExtensionDiff', 'view', "page=$escapetool.url($page)&amp;extension=$escapetool.url($extId.id)&amp;version=$escapetool.url($extId.version)"))
+          #set($unchanged = "&lt;a target=${dq}_blank$dq href=$dq$diffUrl$dq&gt;&lt;img src=$dq$xwiki.getSkinFile('icons/silk/exclamation.png')$dq&gt;&lt;/a&gt;")
+        #end
+      #end
+      #set($extFld = "${extFld}${xarRepo.getExtensionName($extId)}&lt;br/&gt;&lt;span class='small'&gt;($extId)&lt;/span&gt;")
+    #end
+  #end
+  #if ($xarRepo.hasSVN())
+    #set($svn = '&lt;img src="/xwiki/resources/icons/silk/add.png"&gt;')
+    #set ($svnDoc = $xarRepo.getDocumentFromSVN($page))
+    #if ($svnDoc)
+      #if ($xarRepo.isEqual($xarRepo.getComparableXML($wikidoc),$xarRepo.getComparableXML($svnDoc)))
+        #if ($unchanged.startsWith('&lt;img'))
+          #set($svn = "&lt;img src=$dq$xwiki.getSkinFile('icons/silk/error_delete.png')$dq&gt;")
+        #else
+          #set($svn = "&lt;img src=$dq$xwiki.getSkinFile('icons/silk/accept.png')$dq&gt;")
+        #end
+      #else
+        #set($diffUrl = $xwiki.getURL('WikiAnalyzer.ShowSVNDiff', 'view', "page=$escapetool.url($page)"))
+        #set($svn = "&lt;a target=${dq}_blank$dq href=$dq$diffUrl$dq&gt;&lt;img src=$dq$xwiki.getSkinFile('icons/silk/exclamation.png')$dq&gt;&lt;/a&gt;")
+      #end
+    #else
+      #if ($unchanged.startsWith('&lt;a'))
+        #set($svn = "&lt;img src=$dq$xwiki.getSkinFile('icons/silk/error_add.png')$dq&gt;")
+      #else
+        #set($svn = "")
+      #end
+    #end
+  #else
+    #set($svn = "&lt;img src=$dq$xwiki.getSkinFile('icons/silk/cog_error.png')$dq&gt;")
+  #end
+
+  #set($discard = $row.put('__svn', $svn))
+  #set($discard = $row.put('__unchanged', $unchanged))
+  #set($discard = $row.put('__extensions', $extFld))
+  
+#end
+#set($discard = $map.put('rows', $rows))
+{{/velocity}}
+
+{{velocity wiki="false"}}
+##==================
+## Serialize the map in the JSON format.
+##==================
+$jsontool.serialize($map)
+{{/velocity}}</content>
+</xwikidoc>
