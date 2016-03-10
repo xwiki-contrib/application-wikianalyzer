@@ -15,6 +15,8 @@ Set of tools to analyze the contents of a wiki
 
 ## Available tools
 
+Currently the available tools are still very limited (but useful!), contributions are welcomed !
+
 ### List Installed Extensions
 
 This very basic tool provide in a quickly filterable table the list of all installed extensions with the follwing details:
@@ -23,9 +25,9 @@ This very basic tool provide in a quickly filterable table the list of all insta
  * List of wikis where the extension is installed (namespaces)
  * List of pages installed by the extension
  
-### All Document Status
+### All Documents Status
 
-Somehow similar to the Document index, this livetable contains 3 additional columns:
+Somehow similar to the page index, this livetable contains 3 additional columns:
  * State of the document in comparison to your SVN (works only if the SVNApp is installed with a working profile)
  * State of the document in comparison to the original one in an extension (if the document is from an extension)
  * Name of the extension having installed this document if any
