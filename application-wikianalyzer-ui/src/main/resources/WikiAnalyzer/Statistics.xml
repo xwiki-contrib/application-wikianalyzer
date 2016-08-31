@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<xwikidoc version="1.2" reference="WikiAnalyzer.Statistics" locale="">
+  <web>WikiAnalyzer</web>
+  <name>Statistics</name>
+  <language/>
+  <defaultLanguage/>
+  <translation>0</translation>
+  <creator>xwiki:XWiki.Admin</creator>
+  <creationDate>1472117251000</creationDate>
+  <author>xwiki:XWiki.Admin</author>
+  <contentAuthor>xwiki:XWiki.Admin</contentAuthor>
+  <date>1472639623000</date>
+  <contentUpdateDate>1472639623000</contentUpdateDate>
+  <version>1.1</version>
+  <title>Statistics</title>
+  <comment/>
+  <minorEdit>false</minorEdit>
+  <syntaxId>xwiki/2.1</syntaxId>
+  <hidden>false</hidden>
+  <content>{{velocity}}
+#macro(showWikiInformation $wiki)
+(% class="panel panel-info" %)
+(((
+  (% class="panel-heading" %)(((
+    #if ($xcontext.action == "export")
+      = $wiki.prettyName ($wiki.id) =
+    #else
+      {{html clean="false"}}$wiki.prettyName ($wiki.id){{/html}}
+    #end
+  )))
+  (% class="panel-body" style="padding-left:30px; padding-right:30px; " %)
+  (((
+    (% class="row" %)
+    (((
+      #if ($xcontext.action == "export")== Descriptor == #else; (% style="font-variant: small-caps;" %)Descriptor
+      : #end(((
+        (% class="dl-horizontal" %)
+        ; Alias
+        : $wiki.defaultAlias
+        ; Owner
+        : $wiki.ownerId
+      )))
+      #set ($exclusion = "doc.hidden &lt;&gt; 1 and doc.space not in ('XWiki','WikiAnalyzer') and doc.name &lt;&gt; 'WebPreferences'")
+
+      #if ($xcontext.action == "export")== Documents == #else; (% style="font-variant: small-caps;" %)Documents
+      : #end(((
+        (% class="dl-horizontal" %)
+        #set ($userDocCount = $services.query.xwql("where $exclusion").setWiki($wiki.id).addFilter('count').execute()[0])
+        ; Total
+        : $userDocCount ($services.query.xwql("").setWiki($wiki.id).addFilter('count').execute()[0])
+        ; Visible
+        : $userDocCount ($services.query.xwql("where doc.hidden &lt;&gt; 1").setWiki($wiki.id).addFilter('count').execute()[0])
+        ; Translated
+        : $services.query.xwql("where $exclusion and doc.translation = 1").setWiki($wiki.id).addFilter('count').execute()[0] ($services.query.xwql("where doc.translation = 1").setWiki($wiki.id).addFilter('count').execute()[0])
+      )))
+      (% style="font-variant: small-caps;padding-top:10px" %)
+      #if ($xcontext.action == "export")== Parentship == #else; (% style="font-variant: small-caps;" %)Parentship
+      : #end(((
+        (% class="dl-horizontal" %)
+        ; With parent
+        : $services.query.xwql("where $exclusion and doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0] ($services.query.xwql("where doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0])
+        ; Deeper than 2 levels
+        : $services.query.xwql("from Document pdoc where $exclusion and doc.fullName = pdoc.parent and doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0] ($services.query.xwql("from Document pdoc where doc.fullName = pdoc.parent and doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0])
+        ; Deeper than 3 levels
+        : $services.query.xwql("from Document pdoc, Document ppdoc where $exclusion and pdoc.fullName = ppdoc.parent and doc.fullName = pdoc.parent  and doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0] ($services.query.xwql("from Document pdoc, Document ppdoc where pdoc.fullName = ppdoc.parent and doc.fullName = pdoc.parent  and doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0])
+        ; Deeper than 4 levels
+        : $services.query.xwql("from Document pdoc, Document ppdoc, Document pppdoc where $exclusion and ppdoc.fullName = pppdoc.parent and pdoc.fullName = ppdoc.parent and doc.fullName = pdoc.parent and doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0] ($services.query.xwql("from Document pdoc, Document ppdoc, Document pppdoc where ppdoc.fullName = pppdoc.parent and pdoc.fullName = ppdoc.parent and doc.fullName = pdoc.parent and doc.parent is not null and trim(doc.parent) &lt;&gt; ''").setWiki($wiki.id).addFilter('count').execute()[0])
+        ; Not ND parent
+        : $services.query.xwql("where $exclusion and (doc.name &lt;&gt; 'WebHome' or doc.space like '%.%') and doc.parent is not null and trim(doc.parent) &lt;&gt; '' and doc.parent &lt;&gt; concat(doc.space, '.WebHome')").setWiki($wiki.id).addFilter('count').execute()[0] ($services.query.xwql("where doc.parent is not null and trim(doc.parent) &lt;&gt; '' and doc.parent &lt;&gt; concat(doc.space, '.WebHome')").setWiki($wiki.id).addFilter('count').execute()[0])
+      )))
+      (% style="font-variant: small-caps;padding-top:10px" %)
+      #if ($xcontext.action == "export")== Syntaxes == #else; (% style="font-variant: small-caps;" %)Syntaxes
+      : #end(((
+        #set ($allSyntaxes = $services.query.xwql("select doc.syntaxId, count(doc.id) from Document doc group by doc.syntaxId order by doc.syntaxId").setWiki($wiki.id).execute())
+        #set ($syntaxes = $services.query.xwql("select doc.syntaxId, count(doc.id) from Document doc where $exclusion group by doc.syntaxId order by doc.syntaxId").setWiki($wiki.id).execute())
+        #set ($i = 0)
+        (% class="dl-horizontal" %)
+        #foreach($syntax in $allSyntaxes)
+        ; $syntax[0]
+        : #if($syntaxes[$i][0] == $syntax[0])$syntaxes[$i][1]#set($i = $i + 1)#{else}0#end ($syntax[1])
+        #end
+      )))
+    )))
+  )))
+)))
+#end
+#set($wikis = $services.wiki.getAll())
+{{info}}This farm is composed of $wikis.size() wikis{{/info}}
+#foreach($wiki in $wikis)
+#showWikiInformation($wiki)
+#end
+{{/velocity}}
+</content>
+</xwikidoc>
