@@ -6,6 +6,7 @@
   <language/>
   <defaultLanguage/>
   <translation>0</translation>
+  <parent>WebHome</parent>
   <creator>xwiki:XWiki.Admin</creator>
   <creationDate>1472117251000</creationDate>
   <author>xwiki:XWiki.Admin</author>
