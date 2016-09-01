@@ -4,7 +4,7 @@
   <parent>
     <artifactId>application-wikianalyzer</artifactId>
     <groupId>org.xwiki.contrib.wikianalyzer</groupId>
-    <version>1.1-SNAPSHOT</version>
+    <version>1.1</version>
   </parent>
   <artifactId>application-wikianalyzer-ui</artifactId>
   <name>Wiki Analyzer - UI</name>
